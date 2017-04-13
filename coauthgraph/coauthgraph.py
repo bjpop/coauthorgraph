@@ -122,23 +122,55 @@ class Name(object):
 
 
 def process_bibtex(bibtex_filename):
-    all_authors = defaultdict(int)
+    # set of (author, author) pairs
+    # to normalise the pairs we sort the authors into dictionary order
+    edges = set() 
+    all_authors = set()
     with open(bibtex_filename) as bibtex_file:
         bib_database = bibtexparser.load(bibtex_file)
         for entry in bib_database.entries:
+            paper_authors = set()
             author_list = entry['author']
             author_list = author_list.replace('\n', ' ')
             authors_names = [Name(name.strip()) for name in author_list.split(' and ')]
             for name in authors_names:
-                all_authors[name] += 1
-    for author in sorted(all_authors):
-        print("{} {}".format(author, all_authors[author]))
+                paper_authors.add(name)
+                all_authors.add(name)
+            paper_authors = list(paper_authors)
+            for author1_index in range(len(paper_authors)):
+                for author2_index in range(author1_index + 1, len(paper_authors)):
+                    edge = tuple(sorted([paper_authors[author1_index], paper_authors[author2_index]]))
+                    edges.add(edge)
+    return all_authors, edges
+    #for author1, author2 in edges:
+    #    print("{} : {}".format(author1, author2))
+
+def render_to_json(all_authors, edges):
+    #for author in all_authors:
+    #    print("{{ data: {{ id: '{}' }} }},".format(author))
+    seen_authors = set()
+    for author1, author2 in edges:
+        if author1.last == 'Pope' or author2.last == 'Pope':
+            if author1 not in seen_authors:
+                print("{{ data: {{ id: '{}' }} }},".format(author1))
+                seen_authors.add(author1)
+            if author2 not in seen_authors:
+                print("{{ data: {{ id: '{}' }} }},".format(author2))
+                seen_authors.add(author2)
+
+    id = 0
+    for author1, author2 in edges:
+        if author1.last == 'Pope' or author2.last == 'Pope':
+            print("{{ data: {{ id: '{}', source: '{}', target: '{}' }}}},".format(id, author1, author2))
+            id += 1
+
 
 def main():
     "Orchestrate the execution of the program"
     options = parse_args()
     init_logging(options.log)
-    process_bibtex(options.bibtex)
+    all_authors, edges = process_bibtex(options.bibtex)
+    render_to_json(all_authors, edges)
 
 
 # If this script is run from the command line then call the main function.
